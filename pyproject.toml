@@ -1,0 +1,18 @@
+[project]
+name = "cfcache-figure-artifact"
+version = "0.1.0"
+description = "Self-contained source artifact for reproducing the paper figures"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "duckdb>=1.4.1",
+    "imbalanced-learn>=0.14.0",
+    "matplotlib>=3.10.7",
+    "numpy>=2.3.4",
+    "pandas>=2.3.3",
+    "regex>=2025.11.3",
+    "scikit-learn>=1.7.2",
+    "seaborn>=0.13.2",
+    "skl2onnx>=1.19.1",
+    "zstandard>=0.22.0",
+]

@@ -1,0 +1,10 @@
+/.work/
+/logs/
+/models/
+/output/
+/results/
+/run.json
+/smoke/
+/traces/
+/__pycache__/
+*.py[cod]
