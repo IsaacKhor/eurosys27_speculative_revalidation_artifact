@@ -1,4 +1,4 @@
-# Self-contained paper-figure artifact
+# Eurosys 27 Artifact - A Speculative Approach to CDN Asset Revalidation
 
 This directory contains the source-only workflow needed to regenerate the ten
 empirical figures in the EuroSys 2027 paper. The two architecture and timeline
@@ -71,6 +71,11 @@ the reported results. `--parallel N` controls simultaneous simulator
 configurations. `--plots-only` regenerates plots from existing artifact-local
 results, models, expiry events, and raw traces. `--force` deletes only generated
 data for the selected mode and preserves downloaded public inputs.
+
+Be default, parallelism is capped at 16. Each simulation configuration consumes
+about 10GB of memory peak, so raise it to how much RAM you have available.
+Individual runs are not resumable but use `--resume` to skip completed runs if
+you run out of memory.
 
 ## Outputs
 
