@@ -384,11 +384,11 @@ def ttl_cdf_by_key(inputs: Inputs) -> None:
             quoted_server = server.replace("'", "''")
             cf_frames.append(connection.execute(f"""
                 SELECT '{quoted_server}' AS trace,
-                       FLOOR(CAST(SPLIT_PART(line, ',', 5) AS BIGINT) / 60) AS ttl_min,
+                       FLOOR(CAST(SPLIT_PART(line, ',', 5) AS DOUBLE) / 60) AS ttl_min,
                        COUNT(DISTINCT SPLIT_PART(line, ',', 2)) AS key_count
                 FROM read_csv(
                     '{quoted_path}', columns = {{'line': 'VARCHAR'}}, delim = '\x1f',
-                    header = false, auto_detect = false, quote = ''
+                    header = false, auto_detect = false, quote = '', strict_mode = false
                 )
                 WHERE NOT STARTS_WITH(line, 'timestamp,')
                 GROUP BY ttl_min
@@ -420,7 +420,7 @@ def ttl_cdf_by_key(inputs: Inputs) -> None:
             else (
                 "read_csv("
                 f"'{quoted_path}', columns = {{'line': 'VARCHAR'}}, delim = '\\x1f', "
-                "header = false, auto_detect = false, quote = '')"
+                "header = false, auto_detect = false, quote = '', strict_mode = false)"
             )
         )
         if fb_is_parquet:
@@ -557,10 +557,19 @@ def oracle_eligible(inputs: Inputs) -> None:
     ].sort_values("in").reset_index()
 
     # Positional Series alignment is retained verbatim from the notebook.
-    expiry_max = miss_types.miss_expired / (
-        miss_types.miss_expired + miss_types.miss_evicted
+    # Oracle bounds are generated for a subset of traces; align the baseline
+    # expiry rates by trace key instead of relying on positional Series shapes.
+    miss_types = miss_types.set_index("in")
+    expiry_max = miss_types.loc[oracle1["in"], "miss_expired"] / (
+        miss_types.loc[oracle1["in"], "miss_expired"]
+        + miss_types.loc[oracle1["in"], "miss_evicted"]
     )
-    eligible = 100 - (oracle1.optmiss / never.optmiss * 100)
+    never_by_trace = never.set_index("in")
+    eligible = 100 - (
+        oracle1["optmiss"].to_numpy()
+        / never_by_trace.loc[oracle1["in"], "optmiss"].to_numpy()
+        * 100
+    )
     x = np.arange(len(oracle1.trace))
     width = 0.35
     plt.figure(figsize=(6, 4))

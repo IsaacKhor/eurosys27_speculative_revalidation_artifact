@@ -19,6 +19,10 @@ from another working directory, for example `python3 artifact/reproduce.py`.
 Completed downloads are reused. Use `--resume` to reuse completed computation
 stages as well.
 
+There's no need for custom python package management; the `reproduce.py` script
+will bootstrap its own isolated venv and install all the required packages there
+via `uv`.
+
 ## Public inputs
 
 `download_traces.py` is the only command that fetches inputs. `reproduce.py`
@@ -109,12 +113,11 @@ No diagram directory or diagram asset is created.
 
 ## Requirements and scale
 
-Use Linux with Python 3.11--3.13, `curl`, `gzip`, GNU `cut`/`tail`, `uv`, a C++20
-compiler, xmake, and the zstd command-line tools (`zstd` and `zstdcat`). The
-included `.python-version` selects Python 3.12 for the cleanest locked setup.
-The locked Python dependencies are installed below `.work/`; xmake obtains its
-pinned C++ packages in an artifact-local cache. Both steps require network
-access on a clean machine.
+Use Ubuntu 24.04 Linux and python 3.11--3.13, `curl`, `gzip`, a C++20 compiler,
+xmake, and the zstd command-line tools. The included `.python-version` selects
+Python 3.12 for the cleanest locked setup. The locked Python dependencies are
+installed below `.work/`; xmake obtains its pinned C++ packages in an
+artifact-local cache. Both steps require network access on a clean machine.
 
 The public downloads total approximately 73 GiB and the formatted CSV inputs
 occupy approximately 66 GiB compressed. Conversion and simulation require
