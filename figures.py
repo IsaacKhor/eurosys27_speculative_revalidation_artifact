@@ -269,6 +269,21 @@ def _xy(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
     )
 
 
+def _temporal_split(df: pd.DataFrame, train_frac: float = 1 / 3) -> tuple[pd.DataFrame, pd.DataFrame]:
+    # Expiry-event rows are in temporal order per source, so a positional
+    # split per source is the paper's time-based split: first third trains,
+    # last two thirds evaluate.  Grouping by "in" keeps every source's own
+    # first-third/last-two-thirds boundary.
+    train_parts, test_parts = [], []
+    for _, group in df.groupby("in", sort=False):
+        cut = int(len(group) * train_frac)
+        train_parts.append(group.iloc[:cut])
+        test_parts.append(group.iloc[cut:])
+    train = pd.concat(train_parts) if train_parts else df.iloc[:0]
+    test = pd.concat(test_parts) if test_parts else df.iloc[:0]
+    return train, test
+
+
 def _expiry_ml(inputs: Inputs) -> pd.DataFrame:
     key = "expiry_ml"
     if key in inputs.cache:
@@ -318,12 +333,10 @@ def _collect_model_stats(df: pd.DataFrame, model: Any) -> dict[str, Any]:
         average_precision_score,
         precision_recall_curve,
     )
-    from sklearn.model_selection import train_test_split
 
-    x, y = _xy(df)
-    _, x_test, _, y_test = train_test_split(
-        x, y, test_size=0.33, random_state=42
-    )
+    x, _ = _xy(df)
+    _, test_df = _temporal_split(df)
+    x_test, y_test = _xy(test_df)
     probability = model.predict_proba(x_test)[:, 1]
     precision, recall, _ = precision_recall_curve(y_test, probability)
     return {
@@ -665,9 +678,7 @@ def all_models_feature_importance(inputs: Inputs) -> None:
         }).sort_values("importance", ascending=False))
     cf_stats, fb_stats, wm_stats = stats
     features = sorted(cf_stats.feature.tolist())
-    # Intentional notebook behavior: only the latter two vectors are reindexed
-    # to `features`; CDN1 remains in descending-importance order.
-    cf_importances = cf_stats.importance.tolist()
+    cf_importances = cf_stats.set_index("feature").loc[features, "importance"].tolist()
     fb_importances = fb_stats.set_index("feature").loc[features, "importance"].tolist()
     wm_importances = wm_stats.set_index("feature").loc[features, "importance"].tolist()
     y = np.arange(len(features))
@@ -691,7 +702,6 @@ def all_models_feature_importance(inputs: Inputs) -> None:
 
 
 def heuristic_ml_prc_combined(inputs: Inputs) -> None:
-    from sklearn.model_selection import train_test_split
     from sklearn.metrics import average_precision_score, precision_recall_curve
 
     df = _expiry_ml(inputs)
@@ -703,10 +713,8 @@ def heuristic_ml_prc_combined(inputs: Inputs) -> None:
     ]
     curve_stats = []
     for group, model in zip(groups, models):
-        x, y = _xy(group)
-        _, x_test, _, y_test = train_test_split(
-            x, y, test_size=0.33, random_state=42
-        )
+        _, test_df = _temporal_split(group)
+        x_test, y_test = _xy(test_df)
         probability = model.predict_proba(x_test)[:, 1]
         precision, recall, _ = precision_recall_curve(y_test, probability)
         curve_stats.append((
@@ -844,16 +852,13 @@ def cross_dataset_auc_roc_heatmap(inputs: Inputs) -> None:
     from imblearn.over_sampling import RandomOverSampler
     from sklearn.ensemble import RandomForestClassifier
     from sklearn.metrics import roc_auc_score
-    from sklearn.model_selection import train_test_split
 
     df = _expiry_ml(inputs)
     sources = [source for source in MODEL_SOURCES if source in inputs.sources]
     models: dict[str, Any] = {}
     for source in sources:
-        x, y = _xy(df[df["in"] == source])
-        x_train, x_test, y_train, _ = train_test_split(
-            x, y, test_size=0.33, random_state=42
-        )
+        train_df, _ = _temporal_split(df[df["in"] == source])
+        x_train, y_train = _xy(train_df)
         x_over, y_over = RandomOverSampler(random_state=42).fit_resample(
             x_train, y_train
         )
@@ -871,7 +876,8 @@ def cross_dataset_auc_roc_heatmap(inputs: Inputs) -> None:
     for train_source in sources:
         row: dict[str, Any] = {"train_src": train_source}
         for test_source in sources:
-            x_test, y_test = _xy(df[df["in"] == test_source])
+            _, test_df = _temporal_split(df[df["in"] == test_source])
+            x_test, y_test = _xy(test_df)
             # Published notebook used hard predictions, not probabilities.
             prediction = models[train_source].predict(x_test)
             row[test_source] = roc_auc_score(y_test, prediction)

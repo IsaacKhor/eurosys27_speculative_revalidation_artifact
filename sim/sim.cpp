@@ -30,8 +30,8 @@ enum class StatsMode {
     CooldownSkip,
 };
 
-static constexpr f64 WARMUP_PCT = 0.10;
-static constexpr f64 COOLDOWN_PCT = 0.33;
+static constexpr f64 WARMUP_PCT = 0.33;
+static constexpr f64 COOLDOWN_PCT = 0.15;
 
 static auto trace_uncompressed_reqs(strv base) -> u64
 {

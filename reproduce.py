@@ -759,7 +759,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="prepared trace root (default: artifact/traces; run download_traces.py first)",
     )
     parser.add_argument("--parallel", type=int, default=max(1, min(16, os.cpu_count() or 1)),
-                        help="parallel simulator configurations (default: up to 8)")
+                        help="parallel simulator configurations (default: up to 16)")
     parser.add_argument("--key-sample-ratio", type=int,
                         help="override key sampling ratio (full: 1; smoke: 8)")
     parser.add_argument("--smoke", action="store_true",

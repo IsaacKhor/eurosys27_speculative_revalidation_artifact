@@ -10,7 +10,6 @@ import pandas as pd
 from imblearn.over_sampling import RandomOverSampler
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report
-from sklearn.model_selection import train_test_split
 import skl2onnx
 from skl2onnx.common.data_types import FloatTensorType
 
@@ -45,9 +44,19 @@ def calc_features(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def load_data(paths: Iterable[str], sample_frac: float) -> pd.DataFrame:
-    frames = [read_trace(p, sample_frac) for p in paths]
-    return calc_features(pd.concat(frames, ignore_index=True))
+def load_split(paths: Iterable[str], sample_frac: float, train_frac: float = 1 / 3) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    # Rows in each expiry-event file are in temporal order, so a positional
+    # split per file is the paper's time-based train/eval split: the first
+    # third of events train, the remaining two thirds evaluate.
+    train_frames, test_frames = [], []
+    for path in paths:
+        df = calc_features(read_trace(path, sample_frac))
+        cut = int(len(df) * train_frac)
+        train_frames.append(df.iloc[:cut])
+        test_frames.append(df.iloc[cut:])
+    train = pd.concat(train_frames, ignore_index=True)
+    test = pd.concat(test_frames, ignore_index=True)
+    return train, test
 
 
 def split_xy(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
@@ -96,10 +105,9 @@ def save_model(model: RandomForestClassifier, output_prefix: str, num_features: 
 
 def main() -> None:
     args = parse_args()
-    df = load_data(args.inputs, args.sample_frac)
-
-    x, y = split_xy(df)
-    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.15, random_state=42)
+    train_df, test_df = load_split(args.inputs, args.sample_frac)
+    x_train, y_train = split_xy(train_df)
+    x_test, y_test = split_xy(test_df)
     x_train_over, y_train_over = RandomOverSampler(random_state=42).fit_resample(x_train, y_train) # type: ignore
     model = make_rfc(x_train_over, y_train_over, x_test, y_test)
     save_model(model, args.output, x_train.shape[1])

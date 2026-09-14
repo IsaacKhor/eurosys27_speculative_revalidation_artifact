@@ -114,8 +114,13 @@ def _parse_cf(parts: List[str]) -> tuple[int, int, int, int, int, int, int, bool
     key = int(parts[1].strip(), 16)
     zone = int(parts[2].strip(), 16)
     size = int(parts[3].strip(), 10) & _MASK64
-    ttl = int(parts[4].strip(), 10) & _MASK64
-    ttstale = int(parts[5].strip(), 10) & _MASK64
+    # expiry_time and stale_time are absolute Unix timestamps, not durations.
+    # Convert them to TTLs relative to the request time; a 0 sentinel means
+    # "unset", and an already-elapsed deadline clamps to 0.
+    expiry_time = int(parts[4].strip(), 10)
+    stale_time = int(parts[5].strip(), 10)
+    ttl = max(0, expiry_time - ts) if expiry_time else 0
+    ttstale = max(0, stale_time - ts) if stale_time else 0
     mime = cf_content_type_map(parts[7])
     is_purge = parts[6].strip() == '1'
     return ts, key, zone, size, ttl, ttstale, mime, is_purge
